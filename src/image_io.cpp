@@ -585,42 +585,9 @@ void ViewerApp::LoadImageFromFile(const std::wstring& filePath, bool startAtEnd)
                 ComPtr<IWICBitmapSource> sourceToCache = frame;
                 bool downscaled = false;
                 float ratio = 1.0f;
-                bool loadedPreview = false;
 
-                // Extract the embedded preview for raw/tiff
-                ComPtr<IWICBitmapSource> preview;
-                if (SUCCEEDED(decoder->GetPreview(&preview))) {
-                    UINT previewW = 0, previewH = 0;
-                    if (SUCCEEDED(preview->GetSize(&previewW, &previewH)) && previewW > 0 && previewH > 0) {
-                        sourceToCache = preview;
-                        loadedPreview = true;
-
-                        if (previewW < frameWidth || previewH < frameHeight) {
-                            downscaled = true;
-                            // Deep zoom when past preview's resolution
-                            ratio = std::min(static_cast<float>(previewW) / frameWidth, static_cast<float>(previewH) / frameHeight);
-                        }
-
-                        // Prevent memory spikes for massive previews
-                        if (previewW > maxDim || previewH > maxDim) {
-                            float prevRatio = std::min(static_cast<float>(maxDim) / previewW, static_cast<float>(maxDim) / previewH);
-                            UINT newW = static_cast<UINT>(previewW * prevRatio);
-                            UINT newH = static_cast<UINT>(previewH * prevRatio);
-
-                            ComPtr<IWICBitmapScaler> scaler;
-                            if (SUCCEEDED(localFactory->CreateBitmapScaler(&scaler))) {
-                                if (SUCCEEDED(scaler->Initialize(preview.Get(), newW, newH, WICBitmapInterpolationModeFant))) {
-                                    sourceToCache = scaler;
-                                    downscaled = true;
-                                    ratio = std::min(static_cast<float>(newW) / frameWidth, static_cast<float>(newH) / frameHeight);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Standard load if no preview 
-                if (!loadedPreview && (frameWidth > maxDim || frameHeight > maxDim)) {
+                // Downscale oversized images to fit within maxDim
+                if (frameWidth > maxDim || frameHeight > maxDim) {
                     downscaled = true;
                     ratio = std::min(static_cast<float>(maxDim) / frameWidth, static_cast<float>(maxDim) / frameHeight);
                     UINT newW = static_cast<UINT>(frameWidth * ratio);
