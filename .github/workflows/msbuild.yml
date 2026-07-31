@@ -37,7 +37,7 @@ jobs:
 
     - name: Restore NuGet packages
       working-directory: ${{env.GITHUB_WORKSPACE}}
-      run: nuget restore ${{env.SOLUTION_FILE_PATH}} -SolutionDirectory .
+      run: nuget install Microsoft.Windows.ImplementationLibrary -Version 1.0.260126.7 -OutputDirectory packages
 
     - name: Build
       working-directory: ${{env.GITHUB_WORKSPACE}}
