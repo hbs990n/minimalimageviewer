@@ -203,7 +203,8 @@ static const wchar_t* ActionNames[] = {
     L"Fullscreen", L"Rotate Clockwise", L"Rotate Counter-Clockwise", L"Flip", L"Crop", L"Custom Zoom", L"Exit",
     L"Open File", L"Refresh", L"Copy", L"Paste", L"Save", L"Save As", L"Delete Image", L"Undo",
     L"Center Image", L"Commit Crop", L"Toggle OSD", L"Play/Pause Animation", L"Resume Animation",
-    L"Next Frame", L"Previous Frame", L"First Frame", L"Open Context Menu", L"Toggle Slideshow"
+    L"Next Frame", L"Previous Frame", L"First Frame", L"Open Context Menu", L"Toggle Slideshow",
+    L"Scroll Up", L"Scroll Down"
 };
 
 INT_PTR CALLBACK ViewerApp::KeybindingsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {

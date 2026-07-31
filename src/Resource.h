@@ -51,6 +51,8 @@
 #define IDM_ANIM_FIRST_FRAME        1072
 #define IDM_CONTEXT_MENU            1075
 #define IDM_SLIDESHOW               1076
+#define IDM_SCROLL_UP               1077
+#define IDM_SCROLL_DOWN             1078
 
 #define IDD_RESIZE_DIALOG           201
 #define IDC_EDIT_WIDTH              2001

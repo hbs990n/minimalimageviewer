@@ -97,6 +97,7 @@ enum ActionID {
     Act_Open, Act_Refresh, Act_Copy, Act_Paste, Act_Save, Act_SaveAs, Act_Delete, Act_Undo,
     Act_CenterImage, Act_CommitCrop, Act_ToggleOSD, Act_PlayPause, Act_ResumeAnim,
     Act_AnimNext, Act_AnimPrev, Act_AnimFirst, Act_ContextMenu, Act_Slideshow,
+    Act_ScrollUp, Act_ScrollDown,
     Act_Count
 };
 

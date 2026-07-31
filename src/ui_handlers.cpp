@@ -33,6 +33,20 @@ void ViewerApp::HandleCommand(WORD cmd) {
         break;
     case IDM_COPY:          HandleCopy(); break;
     case IDM_PASTE:         HandlePaste(); break;
+    case IDM_SCROLL_UP:
+    case IDM_SCROLL_DOWN: {
+        RECT cr;
+        GetClientRect(m_ctx.hWnd, &cr);
+        int step = std::max(30, (cr.bottom - cr.top) / 10);
+        if (cmd == IDM_SCROLL_UP) {
+            m_ctx.offsetY += static_cast<float>(step);
+        }
+        else {
+            m_ctx.offsetY -= static_cast<float>(step);
+        }
+        InvalidateRect(m_ctx.hWnd, nullptr, FALSE);
+        break;
+    }
     case IDM_NEXT_IMG:
         if (!m_ctx.imageFiles.empty() && m_ctx.currentImageIndex != -1) {
             size_t size = m_ctx.imageFiles.size();
@@ -277,6 +291,8 @@ void ViewerApp::OnContextMenu(HWND hWnd, POINT pt) {
     AppendMenuW(hViewMenu, MF_STRING, IDM_ZOOM_200, L"Zoom 200%");
     AppendMenuW(hViewMenu, MF_STRING, IDM_ZOOM_300, L"Zoom 300%");
     addAction(hViewMenu, IDM_FIT_TO_WINDOW, Act_Fit, L"Fit to Window");
+    addAction(hViewMenu, IDM_SCROLL_UP, Act_ScrollUp, L"Scroll Up");
+    addAction(hViewMenu, IDM_SCROLL_DOWN, Act_ScrollDown, L"Scroll Down");
     AppendMenuW(hViewMenu, MF_SEPARATOR, 0, nullptr);
     addAction(hViewMenu, IDM_FULLSCREEN, Act_Fullscreen, L"Full Screen");
     addAction(hViewMenu, IDM_SLIDESHOW, Act_Slideshow, L"Toggle Slideshow");
