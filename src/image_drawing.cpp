@@ -448,41 +448,57 @@ void ViewerApp::Render() {
 
                         // Natively initialize virtualized image source on demand
                         if (!m_ctx.highResImageSource) {
-                            ComPtr<IWICBitmapDecoder> decoder;
-                            HRESULT hrDecoder = m_ctx.wicFactory->CreateDecoderFromStream(m_ctx.wicStream.Get(), NULL, WICDecodeMetadataCacheOnLoad, &decoder);
-                            if (SUCCEEDED(hrDecoder)) {
-                                ComPtr<IWICBitmapFrameDecode> frame;
-                                HRESULT hrFrame = decoder->GetFrame(0, &frame);
-                                if (SUCCEEDED(hrFrame)) {
-                                    ComPtr<IWICFormatConverter> converter;
-                                    HRESULT hrConv = m_ctx.wicFactory->CreateFormatConverter(&converter);
-                                    if (SUCCEEDED(hrConv)) {
-                                        HRESULT hrInit = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
-                                        if (SUCCEEDED(hrInit)) {
-                                            HRESULT hrSrc = dc5->CreateImageSourceFromWic(
-                                                converter.Get(),
-                                                D2D1_IMAGE_SOURCE_LOADING_OPTIONS_NONE,
-                                                D2D1_ALPHA_MODE_PREMULTIPLIED,
-                                                &m_ctx.highResImageSource
-                                            );
-                                            DebugLogFmt(
-                                                L"[HIGHRES] CreateImageSourceFromWic hr=0x%08X success=%d stream=%d",
-                                                hrSrc, SUCCEEDED(hrSrc) ? 1 : 0, m_ctx.wicStream ? 1 : 0);
+                            // Create a FRESH stream for each decode attempt.
+                            // Reusing m_ctx.wicStream fails because its internal
+                            // position was left at EOF by the initial decode
+                            // (CreateDecoderFromStream -> hr=0x88982F61).
+                            ComPtr<IWICStream> freshStream;
+                            HRESULT hrStream = m_ctx.wicFactory->CreateStream(&freshStream);
+                            if (SUCCEEDED(hrStream)) {
+                                hrStream = freshStream->InitializeFromMemory(
+                                    m_ctx.rawFileData.data(),
+                                    static_cast<DWORD>(m_ctx.rawFileData.size()));
+                            }
+                            if (SUCCEEDED(hrStream)) {
+                                ComPtr<IWICBitmapDecoder> decoder;
+                                HRESULT hrDecoder = m_ctx.wicFactory->CreateDecoderFromStream(freshStream.Get(), NULL, WICDecodeMetadataCacheOnLoad, &decoder);
+                                if (SUCCEEDED(hrDecoder)) {
+                                    ComPtr<IWICBitmapFrameDecode> frame;
+                                    HRESULT hrFrame = decoder->GetFrame(0, &frame);
+                                    if (SUCCEEDED(hrFrame)) {
+                                        ComPtr<IWICFormatConverter> converter;
+                                        HRESULT hrConv = m_ctx.wicFactory->CreateFormatConverter(&converter);
+                                        if (SUCCEEDED(hrConv)) {
+                                            HRESULT hrInit = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
+                                            if (SUCCEEDED(hrInit)) {
+                                                HRESULT hrSrc = dc5->CreateImageSourceFromWic(
+                                                    converter.Get(),
+                                                    D2D1_IMAGE_SOURCE_LOADING_OPTIONS_NONE,
+                                                    D2D1_ALPHA_MODE_PREMULTIPLIED,
+                                                    &m_ctx.highResImageSource
+                                                );
+                                                DebugLogFmt(
+                                                    L"[HIGHRES] CreateImageSourceFromWic hr=0x%08X success=%d",
+                                                    hrSrc, SUCCEEDED(hrSrc) ? 1 : 0);
+                                            }
+                                            else {
+                                                DebugLogFmt(L"[HIGHRES] converter->Initialize FAILED hr=0x%08X", hrInit);
+                                            }
                                         }
                                         else {
-                                            DebugLogFmt(L"[HIGHRES] converter->Initialize FAILED hr=0x%08X", hrInit);
+                                            DebugLogFmt(L"[HIGHRES] CreateFormatConverter FAILED hr=0x%08X", hrConv);
                                         }
                                     }
                                     else {
-                                        DebugLogFmt(L"[HIGHRES] CreateFormatConverter FAILED hr=0x%08X", hrConv);
+                                        DebugLogFmt(L"[HIGHRES] GetFrame(0) FAILED hr=0x%08X", hrFrame);
                                     }
                                 }
                                 else {
-                                    DebugLogFmt(L"[HIGHRES] GetFrame(0) FAILED hr=0x%08X", hrFrame);
+                                    DebugLogFmt(L"[HIGHRES] CreateDecoderFromStream FAILED hr=0x%08X", hrDecoder);
                                 }
                             }
                             else {
-                                DebugLogFmt(L"[HIGHRES] CreateDecoderFromStream FAILED hr=0x%08X wicStream=%d", hrDecoder, m_ctx.wicStream ? 1 : 0);
+                                DebugLogFmt(L"[HIGHRES] fresh stream init FAILED hr=0x%08X", hrStream);
                             }
                         }
 
