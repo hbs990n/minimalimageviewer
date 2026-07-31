@@ -40,6 +40,7 @@ void ViewerApp::HandleCommand(WORD cmd) {
             std::wstring title = PathFindFileNameW(m_ctx.imageFiles[m_ctx.currentImageIndex].c_str());
             title += L"  [Loading...] - Minimal Image Viewer v2.0.3";
             SetWindowTextW(m_ctx.hWnd, title.c_str());
+            m_ctx.preserveView = true;
             LoadImageFromFile(m_ctx.imageFiles[m_ctx.currentImageIndex], false);
         }
         break;
@@ -50,6 +51,7 @@ void ViewerApp::HandleCommand(WORD cmd) {
             std::wstring title = PathFindFileNameW(m_ctx.imageFiles[m_ctx.currentImageIndex].c_str());
             title += L"  [Loading...] - Minimal Image Viewer v2.0.3";
             SetWindowTextW(m_ctx.hWnd, title.c_str());
+            m_ctx.preserveView = true;
             LoadImageFromFile(m_ctx.imageFiles[m_ctx.currentImageIndex], true);
         }
         break;
