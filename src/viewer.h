@@ -38,8 +38,6 @@
 using Microsoft::WRL::ComPtr;
 #include <wil/resource.h>
 #include "resource.h"
-
-void DebugLog(const wchar_t* fmt, ...);
 #include <compare>
 #include <ranges>
 

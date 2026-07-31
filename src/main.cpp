@@ -1,7 +1,4 @@
 #include "viewer.h"
-#include <cstdio>
-#include <cstdarg>
-#include <cwchar>
 
 // define dark mode for older Windows
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
@@ -228,21 +225,4 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE, _In_ LPWSTR 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     ViewerApp app;
     return app.Run(hInstance, nCmdShow, lpCmdLine);
-}
-
-void DebugLog(const wchar_t* fmt, ...) {
-    wchar_t path[MAX_PATH];
-    GetModuleFileNameW(nullptr, path, MAX_PATH);
-    wchar_t* slash = wcsrchr(path, L'\\');
-    if (slash) *(slash + 1) = L'\0';
-    wcscat_s(path, L"viewer_debug.log");
-    FILE* f = nullptr;
-    _wfopen_s(&f, path, L"a");
-    if (!f) return;
-    va_list args;
-    va_start(args, fmt);
-    vfwprintf(f, fmt, args);
-    va_end(args);
-    fwprintf(f, L"\n");
-    fclose(f);
 }
