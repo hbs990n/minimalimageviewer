@@ -22,6 +22,7 @@ void ViewerApp::OnPaint(HWND hWnd) {
 }
 
 void ViewerApp::HandleCommand(WORD cmd) {
+    DebugLog(L"[CMD] id=%u (0x%04X)", cmd, cmd);
     switch (cmd) {
     case IDM_OPEN:          OpenFileAction(); break;
     case IDM_REFRESH:

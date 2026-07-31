@@ -58,6 +58,10 @@ void ViewerApp::ReadSettings(const std::wstring& path, WINDOWPLACEMENT& wp, bool
             }
         }
     }
+    for (int i = 0; i < Act_Count; ++i) {
+        DebugLog(L"[KEYS] %s = 0x%04X", keyNames[i], m_ctx.hotkeys[i]);
+    }
+    DebugLog(L"[KEYS] settings path: %s", path.c_str());
 }
 
 void ViewerApp::WriteSettings(const std::wstring& path, const WINDOWPLACEMENT& wp, bool fullscreen, bool singleInstance, bool alwaysOnTop) {
