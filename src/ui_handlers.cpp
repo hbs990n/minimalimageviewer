@@ -37,7 +37,7 @@ void ViewerApp::HandleCommand(WORD cmd) {
     case IDM_SCROLL_DOWN: {
         RECT cr;
         GetClientRect(m_ctx.hWnd, &cr);
-        int step = std::max(30, (cr.bottom - cr.top) / 10);
+        int step = std::max(30, static_cast<int>((cr.bottom - cr.top) / 10));
         if (cmd == IDM_SCROLL_UP) {
             m_ctx.offsetY += static_cast<float>(step);
         }
