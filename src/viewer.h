@@ -40,6 +40,13 @@ using Microsoft::WRL::ComPtr;
 #include "resource.h"
 #include <compare>
 #include <ranges>
+#include <mutex>
+
+// ---- Debug file logging (writes to <exe dir>\viewer_debug.log) ----
+extern std::mutex g_debugLogMutex;
+extern HANDLE g_debugLogFile;
+void DebugLog(const std::wstring& text);
+void DebugLogFmt(const wchar_t* fmt, ...);
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -186,6 +193,12 @@ struct AppContext {
     UINT originalHeight = 0;
     bool isDownscaled = false;
     float downscaleRatio = 1.0f;
+    float lastLoggedZoom = -1.0f;
+    bool lastLoggedDownscaled = false;
+    float lastLoggedDownscaleRatio = -1.0f;
+    bool lastLoggedUseHighRes = false;
+    bool lastLoggedHighResCreated = false;
+    bool lastLoggedIsLoading = true;
     std::vector<ComPtr<IWICBitmapSource>> undoStack;
     ComPtr<IDWriteTextFormat> textFormat = nullptr;
     ComPtr<ID2D1SolidColorBrush> textBrush = nullptr;

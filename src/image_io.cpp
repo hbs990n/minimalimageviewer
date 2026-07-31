@@ -651,6 +651,12 @@ void ViewerApp::LoadImageFromFile(const std::wstring& filePath, bool startAtEnd)
                     m_ctx.isDownscaled = downscaled;
                     m_ctx.downscaleRatio = ratio;
 
+                    DebugLogFmt(
+                        L"[LOAD] path=%s orig=%ux%u frame=%ux%u downscaled=%d ratio=%.4f rawData=%zuB wicStream=%d",
+                        filePath.c_str(), m_ctx.stagedWidth, m_ctx.stagedHeight,
+                        frameWidth, frameHeight, downscaled ? 1 : 0, ratio,
+                        m_ctx.stagedRawFileData.size(), stream ? 1 : 0);
+
                     PostMessage(m_ctx.hWnd, WM_APP_IMAGE_READY, 1, (LPARAM)mySeqId);
                     return;
                 }

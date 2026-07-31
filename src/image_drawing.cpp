@@ -1,6 +1,46 @@
 #include "viewer.h"
 #include <d2d1helper.h>
 #include <numbers>
+#include <cstdarg>
+#include <cstdio>
+
+std::mutex g_debugLogMutex;
+HANDLE g_debugLogFile = INVALID_HANDLE_VALUE;
+
+static void EnsureDebugLogFile() {
+    if (g_debugLogFile != INVALID_HANDLE_VALUE) return;
+    wchar_t exePath[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+    wchar_t* slash = wcsrchr(exePath, L'\\');
+    if (!slash) return;
+    *(slash + 1) = L'\0';
+    wcscat_s(exePath, L"viewer_debug.log");
+    g_debugLogFile = CreateFileW(
+        exePath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+}
+
+void DebugLog(const std::wstring& text) {
+    std::lock_guard<std::mutex> lock(g_debugLogMutex);
+    EnsureDebugLogFile();
+    if (g_debugLogFile == INVALID_HANDLE_VALUE) return;
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wchar_t prefix[64];
+    swprintf_s(prefix, L"[%02u:%02u:%02u.%03u] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+    std::wstring line = prefix + text + L"\r\n";
+    DWORD written = 0;
+    WriteFile(g_debugLogFile, line.c_str(), static_cast<DWORD>(line.size() * sizeof(wchar_t)), &written, nullptr);
+}
+
+void DebugLogFmt(const wchar_t* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    wchar_t buf[2048];
+    vswprintf_s(buf, fmt, args);
+    va_end(args);
+    DebugLog(buf);
+}
 
 
 
@@ -374,6 +414,34 @@ void ViewerApp::Render() {
 
                 // Hardware-Accelerated Deep Zoom
                 bool useHighRes = m_ctx.isDownscaled && m_ctx.zoomFactor > m_ctx.downscaleRatio && !m_ctx.rawFileData.empty() && !m_ctx.isFading;
+
+                // Log the render decision whenever any relevant state changed (throttled)
+                if (m_ctx.zoomFactor != m_ctx.lastLoggedZoom ||
+                    m_ctx.isDownscaled != m_ctx.lastLoggedDownscaled ||
+                    m_ctx.downscaleRatio != m_ctx.lastLoggedDownscaleRatio ||
+                    useHighRes != m_ctx.lastLoggedUseHighRes ||
+                    (m_ctx.highResImageSource != nullptr) != m_ctx.lastLoggedHighResCreated ||
+                    m_ctx.isLoading != m_ctx.lastLoggedIsLoading)
+                {
+                    DebugLogFmt(
+                        L"[RENDER] orig=%ux%u bmp=%.0fx%.0f zoom=%.4f ratio=%.4f isDownscaled=%d useHighRes=%d rawData=%zuB highResCreated=%d isLoading=%d interp=%s",
+                        m_ctx.originalWidth, m_ctx.originalHeight,
+                        bmpSize.width, bmpSize.height,
+                        m_ctx.zoomFactor, m_ctx.downscaleRatio,
+                        m_ctx.isDownscaled ? 1 : 0,
+                        useHighRes ? 1 : 0,
+                        m_ctx.rawFileData.size(),
+                        (m_ctx.highResImageSource != nullptr) ? 1 : 0,
+                        m_ctx.isLoading ? 1 : 0,
+                        interpModeBmp == D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR ? L"NEAREST" : L"LINEAR");
+                    m_ctx.lastLoggedZoom = m_ctx.zoomFactor;
+                    m_ctx.lastLoggedDownscaled = m_ctx.isDownscaled;
+                    m_ctx.lastLoggedDownscaleRatio = m_ctx.downscaleRatio;
+                    m_ctx.lastLoggedUseHighRes = useHighRes;
+                    m_ctx.lastLoggedHighResCreated = (m_ctx.highResImageSource != nullptr);
+                    m_ctx.lastLoggedIsLoading = m_ctx.isLoading;
+                }
+
                 if (useHighRes) {
                     ComPtr<ID2D1DeviceContext5> dc5;
                     if (SUCCEEDED(m_ctx.renderTarget->QueryInterface(IID_PPV_ARGS(&dc5)))) {
@@ -381,21 +449,40 @@ void ViewerApp::Render() {
                         // Natively initialize virtualized image source on demand
                         if (!m_ctx.highResImageSource) {
                             ComPtr<IWICBitmapDecoder> decoder;
-                            if (SUCCEEDED(m_ctx.wicFactory->CreateDecoderFromStream(m_ctx.wicStream.Get(), NULL, WICDecodeMetadataCacheOnLoad, &decoder))) {
+                            HRESULT hrDecoder = m_ctx.wicFactory->CreateDecoderFromStream(m_ctx.wicStream.Get(), NULL, WICDecodeMetadataCacheOnLoad, &decoder);
+                            if (SUCCEEDED(hrDecoder)) {
                                 ComPtr<IWICBitmapFrameDecode> frame;
-                                if (SUCCEEDED(decoder->GetFrame(0, &frame))) {
+                                HRESULT hrFrame = decoder->GetFrame(0, &frame);
+                                if (SUCCEEDED(hrFrame)) {
                                     ComPtr<IWICFormatConverter> converter;
-                                    if (SUCCEEDED(m_ctx.wicFactory->CreateFormatConverter(&converter))) {
-                                        if (SUCCEEDED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom))) {
-                                            dc5->CreateImageSourceFromWic(
+                                    HRESULT hrConv = m_ctx.wicFactory->CreateFormatConverter(&converter);
+                                    if (SUCCEEDED(hrConv)) {
+                                        HRESULT hrInit = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.f, WICBitmapPaletteTypeCustom);
+                                        if (SUCCEEDED(hrInit)) {
+                                            HRESULT hrSrc = dc5->CreateImageSourceFromWic(
                                                 converter.Get(),
                                                 D2D1_IMAGE_SOURCE_LOADING_OPTIONS_NONE,
                                                 D2D1_ALPHA_MODE_PREMULTIPLIED,
                                                 &m_ctx.highResImageSource
                                             );
+                                            DebugLogFmt(
+                                                L"[HIGHRES] CreateImageSourceFromWic hr=0x%08X success=%d stream=%d",
+                                                hrSrc, SUCCEEDED(hrSrc) ? 1 : 0, m_ctx.wicStream ? 1 : 0);
+                                        }
+                                        else {
+                                            DebugLogFmt(L"[HIGHRES] converter->Initialize FAILED hr=0x%08X", hrInit);
                                         }
                                     }
+                                    else {
+                                        DebugLogFmt(L"[HIGHRES] CreateFormatConverter FAILED hr=0x%08X", hrConv);
+                                    }
                                 }
+                                else {
+                                    DebugLogFmt(L"[HIGHRES] GetFrame(0) FAILED hr=0x%08X", hrFrame);
+                                }
+                            }
+                            else {
+                                DebugLogFmt(L"[HIGHRES] CreateDecoderFromStream FAILED hr=0x%08X wicStream=%d", hrDecoder, m_ctx.wicStream ? 1 : 0);
                             }
                         }
 
@@ -414,9 +501,16 @@ void ViewerApp::Render() {
                                 D2D1_INTERPOLATION_MODE_LINEAR,
                                 D2D1_COMPOSITE_MODE_SOURCE_OVER
                             );
+                            DebugLogFmt(
+                                L"[HIGHRES] DrawImage ratioX=%.4f ratioY=%.4f drawn=1",
+                                ratioX, ratioY);
+                            m_ctx.lastLoggedHighResCreated = true;
 
                             // Restore original transform
                             dc5->SetTransform(currentTransform);
+                        }
+                        else {
+                            DebugLogFmt(L"[HIGHRES] useHighRes=true but highResImageSource is NULL -> drawing low-res base only");
                         }
                     }
                 }
@@ -600,6 +694,12 @@ void ViewerApp::ZoomImage(float factor, POINT pt) {
     m_ctx.offsetX += (mouseXBeforeZoom - mouseXAfterZoom);
     m_ctx.offsetY += (mouseYBeforeZoom - mouseYAfterZoom);
     m_ctx.zoomFactor = newZoomFactor;
+
+    DebugLogFmt(
+        L"[ZOOM] factor=%.4f -> %.4f (x%.2f) downscaleRatio=%.4f willUseHighRes=%d",
+        m_ctx.zoomFactor / factor, m_ctx.zoomFactor, factor,
+        m_ctx.downscaleRatio,
+        (m_ctx.isDownscaled && m_ctx.zoomFactor > m_ctx.downscaleRatio && !m_ctx.rawFileData.empty()) ? 1 : 0);
 
     InvalidateRect(m_ctx.hWnd, nullptr, FALSE);
 }
